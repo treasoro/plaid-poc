@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from "react";
-import { startLink } from "@/utils/plaid";
+import { useState, useEffect, useCallback } from "react";
+// import { startLink } from "@/utils/plaid";
+import { usePlaidLink } from 'react-plaid-link';
 
 type User = {
   id: number
@@ -11,7 +12,7 @@ type User = {
 export default function Home() {
   const [signedIn, setSignedIn] = useState(false);
   const [allUsers, setAllUsers ] = useState<User[]>([])
-
+  const [token, setToken] = useState(null);
   
 
   const createNewUser = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -51,11 +52,41 @@ export default function Home() {
     }
   }
 
-  const connectToBank = async () => {
-    await startLink(() => {
-      console.log("success!")
-    })
-  }
+  useEffect(() => {
+    const createLinkToken = async () => {
+      const response = await fetch('/api/plaid/tokens/generate_link_token', {
+        method: 'POST',
+      });
+      const { link_token } = await response.json();
+      setToken(link_token);
+    };
+    createLinkToken();
+  }, []);
+
+  const onSuccess = useCallback(async (publicToken: string) => {
+    console.log("publicToken")
+    console.log(publicToken)
+    await fetch('/api/plaid/tokens/exchange_public_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ public_token: publicToken }),
+    });    
+  }, []);
+
+  const { open, ready } = usePlaidLink({
+    token,
+    onSuccess,
+  });
+
+  // const connectToBank = async () => {
+  //   await startLink(() => {
+  //     open
+  //   })
+  // }
+
+  
 
   useEffect(() => {
     const getAllUsers = async () => {
@@ -120,7 +151,7 @@ export default function Home() {
         </section>
 
         <section className="my-4 mx-8">
-          <button className="btn btn-primary" onClick={connectToBank}>Connect my bank!</button>
+          <button className="btn btn-primary" onClick={() => open()} disabled={!ready}>Connect my bank!</button>
         </section>
       </>
       }
